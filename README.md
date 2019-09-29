@@ -5,6 +5,7 @@
 本脚本仅适用于制作macOS 10.14.x的ISO文件
 
 步骤：
+
 1、使用macOS Mojave Patcher Tool下载完整的安装文件，工具下载地址如下，注意只使用下载安装文件的功能，不要使用其他功能
 http://dosdude1.com/mojave/
 
