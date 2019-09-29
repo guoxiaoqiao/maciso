@@ -13,7 +13,7 @@ APP_PATH="/Applications/Install macOS Mojave.app"
 DMG_PATH="$APP_PATH/Contents/SharedSupport"
 
 # 先卸载要用到的卷名，避免冲突
-hdiutil detach "/Volumes/OS X Base System" &> /dev/null
+hdiutil detach "/Volumes/macOS Base System" &> /dev/null
 rm /tmp/Mojave.sparseimage &> /dev/null
 
 # 计算要最终镜像的大小
@@ -30,10 +30,10 @@ hdiutil attach /tmp/Mojave.sparseimage -noverify -nobrowse -mountpoint /Volumes/
 asr restore -source "$DMG_PATH/BaseSystem.dmg" -target /Volumes/install_build -noprompt -noverify -erase
 
 # 更改磁盘名称与当前版本相关
-VERSION=$(sed -n -e 's/.*<string>\(.*\)<\/string>.*/\1/p' /Volumes/OS\ X\ Base\ System/System/Library/CoreServices/SystemVersion.plist | tail -n 1)
+VERSION=$(grep -A 1 'ProductUserVisibleVersion' /Volumes/macOS\ Base\ System/System/Library/CoreServices/SystemVersion.plist | sed -n -e 's/.*<string>\(.*\)<\/string>.*/\1/p')
 VOLUME_NAME="macOS $VERSION Install"
 hdiutil detach /Volumes/"$VOLUME_NAME" &> /dev/null
-diskutil rename "OS X Base System" "$VOLUME_NAME"
+diskutil rename "macOS Base System" "$VOLUME_NAME"
 
 # 复制光盘图标
 cp -p "$DMG_PATH"/../../Contents/Resources/InstallAssistant.icns /Volumes/"$VOLUME_NAME"/.VolumeIcon.icns
@@ -51,7 +51,7 @@ EOF
 
 # 复制完整安装程序到镜像，排除重复的文件
 rm -rf "/Volumes/"$VOLUME_NAME"/Install macOS Mojave.app"
-rsync -a --progress "$APP_PATH" /Volumes/"$VOLUME_NAME"/
+rsync -a "$APP_PATH" /Volumes/"$VOLUME_NAME"/
 
 # Unmount the Mojave ISO Image
 hdiutil detach /Volumes/"$VOLUME_NAME"
