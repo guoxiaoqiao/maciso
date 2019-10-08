@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# 用于创建macOS安装ISO的脚本文件
+# 初始脚本来源：http://www.insanelymac.com/forum/topic/308533-how-to-create-a-bootable-el-capitan-iso-fo-vmware/
+# Catalina.app的ISO制作方法也参考了：http://www.kaufmann.no/roland/articles/20171007-high-sierra-iso.html
+
+# 本文件更新地址：https://github.com/guoxiaoqiao/maciso
+
+set -x
+
+SCRIPT_PATH=`pwd`/$0
+APP_PATH=~/Downloads/Install\ macOS\ Catalina.app
+DMG_PATH="$APP_PATH/Contents/SharedSupport"
+
+# 先卸载要用到的卷名，避免冲突
+hdiutil detach "/Volumes/macOS Base System" &> /dev/null
+rm /tmp/Catalina.app.sparseimage &> /dev/null
+
+# 计算要最终镜像的大小
+APP_SIZE=$(du -hsm "$APP_PATH" | awk -F ' ' '{print $1}')
+TOTAL_SIZE=`expr $APP_SIZE + 1250`m
+
+# Create the Catalina.app Blank ISO Image with a Single Partition - Apple Partition Map
+hdiutil create -o /tmp/Catalina.app -size $TOTAL_SIZE -layout SPUD -fs HFS+J -type SPARSE
+
+# Mount the Catalina.app Blank ISO Image
+hdiutil attach /tmp/Catalina.app.sparseimage -noverify -nobrowse -mountpoint /Volumes/install_build
+
+# Restore the Base System into the Catalina.app Blank ISO Image
+asr restore -source "$DMG_PATH/BaseSystem.dmg" -target /Volumes/install_build -noprompt -noverify -erase
+
+# 更改磁盘名称与当前版本相关
+VERSION=$(grep -A 1 'ProductUserVisibleVersion' /Volumes/macOS\ Base\ System/System/Library/CoreServices/SystemVersion.plist | sed -n -e 's/.*<string>\(.*\)<\/string>.*/\1/p')
+VOLUME_NAME="macOS $VERSION Install"
+hdiutil detach /Volumes/"$VOLUME_NAME" &> /dev/null
+diskutil rename "macOS Base System" "$VOLUME_NAME"
+
+# 复制光盘图标
+cp -p "$DMG_PATH"/../../Contents/Resources/InstallAssistant.icns /Volumes/"$VOLUME_NAME"/.VolumeIcon.icns
+SetFile -a C /Volumes/"$VOLUME_NAME"/
+
+# 将本脚本复制到光盘
+cp -a $SCRIPT_PATH /Volumes/"$VOLUME_NAME"/
+
+# 写入说明文件
+cat << EOF > /Volumes/"$VOLUME_NAME"/说明.txt
+此镜像为VMware Workstation安装苹果系统用，原始文件来源于苹果系统官方更新包，未添加任何其他程序，完全可放心使用。
+更新包获取方法：在App Store中查找Catalina.app，并点击“获取”，等下载完不安装。然后执行ISO打包脚本即可创建此ISO。
+注意：系统需要先安装Commnad Line Developer Tools才能执行打包命令，或者在执行出错时按提示安装，安装后再次执行即可。
+EOF
+
+# 复制完整安装程序到镜像，排除重复的文件
+rm -rf "/Volumes/"$VOLUME_NAME"/Install macOS Catalina.app.app"
+rsync -a "$APP_PATH" /Volumes/"$VOLUME_NAME"/
+
+# Unmount the Catalina.app ISO Image
+hdiutil detach /Volumes/"$VOLUME_NAME"
+
+# Convert the Catalina.app ISO Image to ISO/CD master (Optional)
+hdiutil convert /tmp/Catalina.app.sparseimage -format UDTO -o /tmp/Catalina.app.iso
+
+rm /tmp/Catalina.app.sparseimage
+
+# Rename the Catalina.app ISO Image and move it to the desktop
+mv /tmp/Catalina.app.iso.cdr ~/Desktop/"$VOLUME_NAME".iso
